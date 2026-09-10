@@ -115,4 +115,5 @@ docker run --rm -v paperclip_paperclip-data:/data -v "$PWD":/backup alpine \
 | 403 "hostname is not allowed" | Add the IP/hostname to `PAPERCLIP_ALLOWED_HOSTNAMES`, `docker compose up -d`. |
 | Logged out right after login | `PAPERCLIP_PUBLIC_URL` is `https://` without TLS. Use `http://` on a plain-HTTP LAN. |
 | Won't start | `docker compose logs server`; usually DB not ready (it waits) or a provider key issue. |
+| `error setting cgroup config ... pids.max: no such file` | Host (often Proxmox/LXC) doesn't delegate cgroup controllers to Docker. The resource limits are already commented out for this reason; either leave them off or enable cgroup delegation on the host, then uncomment `pids_limit`/`mem_limit` in the compose. |
 | Data volume permission errors | Set `USER_UID`/`USER_GID` in `.env` to the host owner and `docker compose build`. |

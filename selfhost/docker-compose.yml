@@ -114,9 +114,14 @@ services:
       start_period: 90s
     # tini is already PID 1 in the image and reaps orphaned agent children.
     # Do NOT add `init: true`.
-    pids_limit: 2048
-    mem_limit: ${PAPERCLIP_MEM_LIMIT:-4g}
-    mem_reservation: 1g
+    #
+    # Per-container resource limits are commented out so this works on hosts that
+    # don't delegate cgroup controllers to Docker (common when Docker runs inside
+    # a Proxmox/LXC container — you'll otherwise get "error setting cgroup config
+    # ... pids.max: no such file"). On a host with cgroup delegation, uncomment:
+    #   pids_limit: 2048
+    #   mem_limit: ${PAPERCLIP_MEM_LIMIT:-4g}
+    #   mem_reservation: 1g
     stop_grace_period: 30s
     security_opt:
       # Container starts as root only to remap the node user + chown the volume,
