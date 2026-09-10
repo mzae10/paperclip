@@ -1,0 +1,140 @@
+# =============================================================================
+# Paperclip AI — self-hosted, LAN-only production stack (built from THIS fork)
+# =============================================================================
+# Run from this directory:
+#   cp .env.example .env    # then edit .env
+#   docker compose up -d --build
+#
+#   * Builds the server image from the repo root (this fork's source) so your
+#     own changes ship in the image.
+#   * External PostgreSQL 17 (the documented production database).
+#   * Posture: authenticated + private -> login required, LAN-reachable, NOT
+#     internet-facing.
+#   * Agents run as subprocesses INSIDE the server container using the baked-in
+#     CLIs. The Docker socket is deliberately NOT mounted.
+#
+# See selfhost/README.md for the full runbook.
+# -----------------------------------------------------------------------------
+
+name: paperclip
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-paperclip}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-paperclip}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-paperclip} -d ${POSTGRES_DB:-paperclip}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    stop_grace_period: 30s
+    networks:
+      - paperclip
+    # No `ports:` on purpose — Postgres is internal only. Never publish 5432.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  server:
+    build:
+      # The build context is the repo root (this fork), where the Dockerfile is.
+      context: ..
+      dockerfile: Dockerfile
+      # 'production' is the lean self-host image; building with no target would
+      # pick 'cloud' (bundles Daytona + Sentry, needs extra network installs).
+      target: production
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: paperclip-selfhost:local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${PAPERCLIP_BIND_ADDR:-0.0.0.0}:${PAPERCLIP_PORT:-3100}:3100"
+    environment:
+      NODE_ENV: production
+      HOST: "0.0.0.0"
+      PORT: "3100"
+      SERVE_UI: "true"
+      PAPERCLIP_HOME: /paperclip
+
+      # ── Database (external Postgres over the internal network) ──
+      DATABASE_URL: postgres://${POSTGRES_USER:-paperclip}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}@db:5432/${POSTGRES_DB:-paperclip}
+      PAPERCLIP_MIGRATION_AUTO_APPLY: "true"
+
+      # ── Deployment posture: LAN, login required, not internet-facing ──
+      PAPERCLIP_DEPLOYMENT_MODE: authenticated
+      PAPERCLIP_DEPLOYMENT_EXPOSURE: private
+      # The URL you type in the browser (LAN IP/hostname). Keep it http:// for a
+      # plain-HTTP LAN — https:// enables Secure cookies and breaks login w/o TLS.
+      PAPERCLIP_PUBLIC_URL: ${PAPERCLIP_PUBLIC_URL:?set to your LAN URL, e.g. http://192.168.1.50:3100}
+      # Every extra IP/hostname clients use (comma-separated). In private mode a
+      # 0.0.0.0 bind is NOT auto-allowed, so unlisted Host headers get a 403.
+      PAPERCLIP_ALLOWED_HOSTNAMES: ${PAPERCLIP_ALLOWED_HOSTNAMES:-}
+      # Signup is OPEN by default; set true after claiming the first admin.
+      PAPERCLIP_AUTH_DISABLE_SIGN_UP: ${PAPERCLIP_AUTH_DISABLE_SIGN_UP:-false}
+
+      # ── Required secrets (generate each with: openssl rand -hex 32) ──
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in .env}
+      PAPERCLIP_TOOL_ACTION_SIGNING_SECRET: ${PAPERCLIP_TOOL_ACTION_SIGNING_SECRET:?PAPERCLIP_TOOL_ACTION_SIGNING_SECRET must be set in .env}
+
+      # ── Logging ──
+      PAPERCLIP_LOG_LEVEL: ${PAPERCLIP_LOG_LEVEL:-info}
+
+      # ── LLM provider keys (optional; at least one lets agents run) ──
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    volumes:
+      # Persistent app data: uploads, secrets master key, agent workspaces,
+      # agent-CLI credentials/state (HOME=/paperclip), run logs, DB backups.
+      # Back this up together with the Postgres data.
+      - paperclip-data:/paperclip
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3100/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    # tini is already PID 1 in the image and reaps orphaned agent children.
+    # Do NOT add `init: true`.
+    pids_limit: 2048
+    mem_limit: ${PAPERCLIP_MEM_LIMIT:-4g}
+    mem_reservation: 1g
+    stop_grace_period: 30s
+    security_opt:
+      # Container starts as root only to remap the node user + chown the volume,
+      # then drops to unprivileged 'node' via gosu. If a future image change
+      # makes boot fail with a permissions error, remove this line first.
+      - no-new-privileges:true
+    networks:
+      - paperclip
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  paperclip:
+    driver: bridge
+
+volumes:
+  pgdata:
+  paperclip-data:

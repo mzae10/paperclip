@@ -1,0 +1,4 @@
+# Never commit real config / secrets
+.env
+.env.*
+!.env.example
