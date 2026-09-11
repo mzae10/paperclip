@@ -25,7 +25,8 @@
       ],
       "whenToUse": "Use browser sign-in for the provider-hosted MCP server.",
       "defaults": {
-        "serverUrl": "https://mcp.supabase.com/mcp"
+        "serverUrl": "https://mcp.supabase.com/mcp",
+        "serverUrlOverrideKey": "instanceUrl"
       },
       "guidanceMd": "Connect Supabase in the browser and scope the connection to one development project. Write tools start enabled and remain governed by Paperclip's action policies.",
       "riskTier": "S4",
@@ -38,6 +39,18 @@
         "Do not connect production data unless you have reviewed Supabase's MCP security guidance."
       ],
       "tenantFields": [
+        {
+          "key": "instanceUrl",
+          "label": "Self-hosted server URL",
+          "type": "text",
+          "advanced": true,
+          "placeholder": "https://mcp.supabase.example.com/mcp",
+          "helperMd": "Leave blank to use Supabase Cloud (mcp.supabase.com). To connect a self-hosted Supabase MCP endpoint, enter its full HTTPS URL.",
+          "validation": {
+            "pattern": "^https://.+",
+            "maxLength": 2048
+          }
+        },
         {
           "key": "projectRef",
           "label": "Project reference",
@@ -89,7 +102,8 @@
       ],
       "whenToUse": "Use a restricted customer-owned key when browser sign-in is not suitable.",
       "defaults": {
-        "serverUrl": "https://mcp.supabase.com/mcp"
+        "serverUrl": "https://mcp.supabase.com/mcp",
+        "serverUrlOverrideKey": "instanceUrl"
       },
       "guidanceMd": "Use a customer-created Supabase key scoped to one development project. Write tools start enabled and remain governed by Paperclip's action policies.",
       "riskTier": "S4",
@@ -118,6 +132,18 @@
         "Do not connect production data unless you have reviewed Supabase's MCP security guidance."
       ],
       "tenantFields": [
+        {
+          "key": "instanceUrl",
+          "label": "Self-hosted server URL",
+          "type": "text",
+          "advanced": true,
+          "placeholder": "https://mcp.supabase.example.com/mcp",
+          "helperMd": "Leave blank to use Supabase Cloud (mcp.supabase.com). To connect a self-hosted Supabase MCP endpoint, enter its full HTTPS URL.",
+          "validation": {
+            "pattern": "^https://.+",
+            "maxLength": 2048
+          }
+        },
         {
           "key": "projectRef",
           "label": "Project reference",

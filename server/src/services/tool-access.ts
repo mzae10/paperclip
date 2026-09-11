@@ -896,7 +896,11 @@ export function normalizeConnectionMethodConfig(
   }
 
   const resolvedServerUrl = resolveConnectionMethodServerUrl(method, values);
-  if (method.defaults?.serverUrlTemplate && !resolvedServerUrl) {
+  const overrideKey = method.defaults?.serverUrlOverrideKey;
+  const overrideProvided = Boolean(
+    overrideKey && typeof values[overrideKey] === "string" && (values[overrideKey] as string).trim().length > 0,
+  );
+  if ((method.defaults?.serverUrlTemplate || overrideProvided) && !resolvedServerUrl) {
     throw badRequest("Missing or invalid connection settings for the server URL");
   }
   const endpoint = resolvedServerUrl ? new URL(resolvedServerUrl) : null;

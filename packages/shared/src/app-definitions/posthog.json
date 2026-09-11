@@ -25,11 +25,24 @@
       ],
       "whenToUse": "Sign in with PostHog in the browser. Recommended for hosted PostHog accounts.",
       "defaults": {
-        "serverUrl": "https://mcp.posthog.com/mcp"
+        "serverUrl": "https://mcp.posthog.com/mcp",
+        "serverUrlOverrideKey": "instanceUrl"
       },
       "guidanceMd": "Connect with PostHog's recommended defaults. Project pinning, read-only access, and catalog filters are optional advanced controls.",
       "riskTier": "S3",
       "tenantFields": [
+        {
+          "key": "instanceUrl",
+          "label": "Self-hosted server URL",
+          "type": "text",
+          "advanced": true,
+          "placeholder": "https://mcp.posthog.example.com/mcp",
+          "helperMd": "Leave blank to use PostHog Cloud (mcp.posthog.com). To connect a self-hosted PostHog MCP endpoint, enter its full HTTPS URL.",
+          "validation": {
+            "pattern": "^https://.+",
+            "maxLength": 2048
+          }
+        },
         {
           "key": "projectId",
           "label": "Pin to project ID",
@@ -145,11 +158,24 @@
       ],
       "whenToUse": "Use a PostHog personal API key when browser sign-in is not suitable.",
       "defaults": {
-        "serverUrl": "https://mcp.posthog.com/mcp"
+        "serverUrl": "https://mcp.posthog.com/mcp",
+        "serverUrlOverrideKey": "instanceUrl"
       },
       "guidanceMd": "Connect with PostHog's recommended defaults. Project pinning, read-only access, and catalog filters are optional advanced controls.",
       "riskTier": "S3",
       "tenantFields": [
+        {
+          "key": "instanceUrl",
+          "label": "Self-hosted server URL",
+          "type": "text",
+          "advanced": true,
+          "placeholder": "https://mcp.posthog.example.com/mcp",
+          "helperMd": "Leave blank to use PostHog Cloud (mcp.posthog.com). To connect a self-hosted PostHog MCP endpoint, enter its full HTTPS URL.",
+          "validation": {
+            "pattern": "^https://.+",
+            "maxLength": 2048
+          }
+        },
         {
           "key": "projectId",
           "label": "Pin to project ID",

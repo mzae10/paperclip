@@ -24,6 +24,22 @@ be connected generically from **Connect your own MCP server** by pasting
 through browser sign-in — with no Paperclip-specific code involved. See
 [Connecting any remote MCP server](./GENERIC-REMOTE-MCP.md).
 
+## Self-hosted PostHog
+
+The curated connection defaults to PostHog Cloud (`https://mcp.posthog.com/mcp`)
+but can point at a self-hosted PostHog MCP endpoint instead. Under **Advanced**,
+set **Self-hosted server URL** to the full HTTPS URL of your instance's MCP
+server (for example `https://mcp.posthog.example.com/mcp`). Leaving it blank
+keeps the PostHog Cloud default, so the same connector serves both.
+
+Mechanics: the method declares `defaults.serverUrlOverrideKey: "instanceUrl"`,
+and the `instanceUrl` tenant field (config-only — never sent as a header or
+query parameter) supplies a full URL that replaces the default server URL when
+present (`resolveConnectionMethodServerUrl`). The endpoint must be HTTPS. The
+API-key method works against any compatible self-hosted MCP server; the OAuth
+method additionally requires that endpoint to support OAuth dynamic client
+registration. Supabase's connector supports the same override.
+
 ## Service involvement
 
 PostHog hosts both the MCP resource and OAuth authorization service. Paperclip

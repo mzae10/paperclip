@@ -10,16 +10,21 @@ const brandingFor=(slug)=>{
  throw new Error(`${slug}: missing local branding provenance`);
 };
 const field=(key,label,placeholder)=>({key,label,type:"password",required:true,placeholder,secret:true});
+// Optional full-URL override for providers whose MCP server can be self-hosted.
+// Blank -> the connector uses its provider-hosted default; a value replaces the
+// server URL entirely (paired with defaults.serverUrlOverrideKey:"instanceUrl").
+const selfHostedUrlField=(providerName,cloudHost,example)=>({key:"instanceUrl",label:"Self-hosted server URL",type:"text",advanced:true,placeholder:example,helperMd:`Leave blank to use ${providerName} Cloud (${cloudHost}). To connect a self-hosted ${providerName} MCP endpoint, enter its full HTTPS URL.`,validation:{pattern:"^https://.+",maxLength:2048}});
 const method=(key,transport,auth,defaults,riskTier,guidanceMd,extra={})=>({key,transport,auth,ownershipModes:auth==="oauth"?["customer","dcr"]:["customer"],whenToUse:transport==="mcp_remote"?"Use the provider-hosted connection for the quickest setup.":"Use credentials from your provider account.",defaults,guidanceMd,riskTier,...extra});
 const vercelConnect=(serviceOrServices,principalMode,scopes,header={name:"Authorization",prefix:"Bearer "})=>({credentialSources:{vercelConnect:{services:Array.isArray(serviceOrServices)?serviceOrServices:[serviceOrServices],principalModes:[principalMode],scopes,header}}});
 const posthogConfigFields=()=>[
+ selfHostedUrlField("PostHog","mcp.posthog.com","https://mcp.posthog.example.com/mcp"),
  {key:"projectId",label:"Pin to project ID",type:"text",advanced:true,placeholder:"Optional numeric project ID",helperMd:"Optional. Pin this connection to one project and remove PostHog's project-switching tool.",validation:{pattern:"^[0-9]+$",maxLength:32},transport:{location:"header",name:"x-posthog-project-id"}},
  {key:"readOnly",label:"Read-only mode",type:"checkbox",advanced:true,defaultValue:false,helperMd:"Turn on to hide tools that can change PostHog data.",transport:{location:"query",name:"readonly",format:"boolean",omitFalse:true}},
  {key:"features",label:"Feature groups",type:"textarea",advanced:true,placeholder:"Optional comma-separated feature groups",helperMd:"Leave blank to expose every feature group, or enter a comma-separated list to narrow access.",validation:{maxLength:500},transport:{location:"query",name:"features",format:"csv"}},
  {key:"tools",label:"Individual tools",type:"textarea",advanced:true,placeholder:"Optional comma-separated tool names",helperMd:"Leave blank to expose all tools. Exact names here are combined with any feature groups.",validation:{maxLength:2000},transport:{location:"query",name:"tools",format:"csv"}},
  {key:"mode",label:"Tool response mode",type:"select",hidden:true,required:true,placeholder:"Individual tools",defaultValue:"tools",options:[{value:"tools",label:"Individual tools"}],helperMd:"Paperclip uses individual tools so every action can be governed. CLI mode remains unavailable until nested execution is governed.",transport:{location:"query",name:"mode"}},
 ];
-const posthogMethod=(key,auth,extra={})=>method(key,"mcp_remote",auth,{serverUrl:"https://mcp.posthog.com/mcp"},"S3","Connect with PostHog's recommended defaults. Project pinning, read-only access, and catalog filters are optional advanced controls.",{tenantFields:posthogConfigFields(),...extra});
+const posthogMethod=(key,auth,extra={})=>method(key,"mcp_remote",auth,{serverUrl:"https://mcp.posthog.com/mcp",serverUrlOverrideKey:"instanceUrl"},"S3","Connect with PostHog's recommended defaults. Project pinning, read-only access, and catalog filters are optional advanced controls.",{tenantFields:posthogConfigFields(),...extra});
 const apps=[
 ["zapier","Zapier","Reach thousands of apps through your Zapier account.","productivity","zapier.com",["https://mcp.zapier.com/*"],method("generated-url","mcp_remote","none",{},"S3","Create a Zapier MCP server, then paste the complete generated connection URL. The token remains embedded in that URL.",{label:"Paste generated MCP URL",whenToUse:"Use the complete provider-generated MCP URL from Zapier."})],
 ["github","GitHub","Read code and pull requests, and coordinate repository work.","developer","github.com",["https://api.githubcopilot.com/mcp/*"],method("mcp-key","mcp_remote","api_key",{serverUrl:"https://api.githubcopilot.com/mcp/"},"S3","Create a fine-grained token limited to the repositories agents should use.",{credentialFields:[field("authorization","GitHub token","github_pat_...")],keyPlacement:{location:"header",name:"Authorization",prefix:"Bearer "},requiredResourceFilters:["organization","repository"]})],
@@ -97,14 +102,15 @@ const specialMethodsFor=(entry)=>{
  ];
  if(entry.slug==="supabase") {
   const tenantFields=[
+   selfHostedUrlField("Supabase","mcp.supabase.com","https://mcp.supabase.example.com/mcp"),
    {key:"projectRef",label:"Project reference",type:"text",required:true,placeholder:"abcdefghijklmnopqrst",helperMd:"Scope the connection to one development project.",transport:{location:"query",name:"project_ref"}},
    {key:"readOnly",label:"Read-only mode",type:"checkbox",defaultValue:false,helperMd:"Enable this to prevent the connection from changing the database.",transport:{location:"query",name:"read_only",format:"boolean"}},
    {key:"features",label:"Feature groups",type:"textarea",advanced:true,placeholder:"database,docs",helperMd:"Optional comma-separated feature groups.",transport:{location:"query",name:"features",format:"csv"}},
   ];
   const warning="Do not connect production data unless you have reviewed Supabase's MCP security guidance.";
   return [
-   oauthMethodFor(entry,"mcp-oauth",entry.serverUrl,{guidanceMd:"Connect Supabase in the browser and scope the connection to one development project. Write tools start enabled and remain governed by Paperclip's action policies.",tenantFields,warnings:[entry.prerequisite,warning],requiredResourceFilters:["project"]}),
-   apiKeyMethodFor(entry,"mcp-api-key",entry.serverUrl,{guidanceMd:"Use a customer-created Supabase key scoped to one development project. Write tools start enabled and remain governed by Paperclip's action policies.",tenantFields,warnings:[entry.prerequisite,warning],requiredResourceFilters:["project"]}),
+   oauthMethodFor(entry,"mcp-oauth",entry.serverUrl,{defaults:{serverUrl:entry.serverUrl,serverUrlOverrideKey:"instanceUrl"},guidanceMd:"Connect Supabase in the browser and scope the connection to one development project. Write tools start enabled and remain governed by Paperclip's action policies.",tenantFields,warnings:[entry.prerequisite,warning],requiredResourceFilters:["project"]}),
+   apiKeyMethodFor(entry,"mcp-api-key",entry.serverUrl,{defaults:{serverUrl:entry.serverUrl,serverUrlOverrideKey:"instanceUrl"},guidanceMd:"Use a customer-created Supabase key scoped to one development project. Write tools start enabled and remain governed by Paperclip's action policies.",tenantFields,warnings:[entry.prerequisite,warning],requiredResourceFilters:["project"]}),
   ];
  }
  return null;

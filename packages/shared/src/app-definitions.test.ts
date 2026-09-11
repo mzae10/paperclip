@@ -223,7 +223,7 @@ describe("AppDefinition catalog",()=>{
   }
  });
  it("configures Shopify's current UCP and compatibility MCP methods without OAuth",()=>{const shopify=APP_DEFINITIONS.find((app)=>app.slug==="shopify");expect(shopify?.methods.map((method)=>method.key)).toEqual(["ucp-commerce","storefront-mcp"]);const ucp=shopify?.methods[0];const compatibility=shopify?.methods[1];expect(ucp).toMatchObject({auth:"none",defaults:{serverUrlTemplate:"https://{storeDomain}/api/ucp/mcp",toolArgumentDefaults:{meta:{"ucp-agent":{profile:"https://shopify.dev/ucp/agent-profiles/examples/2026-04-08/valid-with-capabilities.json"}}}},tenantFields:[expect.objectContaining({key:"storeDomain",required:true})]});expect(compatibility).toMatchObject({auth:"none",defaults:{serverUrlTemplate:"https://{storeDomain}/api/mcp"}});expect(resolveConnectionMethodServerUrl(ucp!,{storeDomain:"paperclip-demo.myshopify.com"})).toBe("https://paperclip-demo.myshopify.com/api/ucp/mcp");expect(resolveConnectionMethodServerUrl(compatibility!,{storeDomain:"paperclip-demo.myshopify.com"})).toBe("https://paperclip-demo.myshopify.com/api/mcp");expect(resolveConnectionMethodServerUrl(ucp!,{})).toBeNull();expect(shopify?.setupPrerequisite).toMatchObject({title:"Launch the storefront before connecting",actionUrl:"https://admin.shopify.com/"});expect(shopify?.setupPrerequisite?.steps?.join(" ")).toContain("Storefront visibility to Public")});
- it("offers PostHog OAuth and API-key methods with zero-config defaults and advanced narrowing",()=>{const posthog=APP_DEFINITIONS.find((app)=>app.slug==="posthog");expect(posthog?.methods.map((method)=>method.key)).toEqual(["mcp-oauth","mcp-api-key"]);for(const method of posthog?.methods??[]){const projectField=method.tenantFields?.find((field)=>field.key==="projectId");expect(method.riskTier).toBe("S3");expect(method.tenantFields?.find((field)=>field.key==="readOnly")).toMatchObject({defaultValue:false,advanced:true});expect(projectField).toMatchObject({advanced:true,transport:{location:"header",name:"x-posthog-project-id"}});expect(projectField?.required).not.toBe(true);expect(method.tenantFields?.filter((field)=>field.advanced).map((field)=>field.key)).toEqual(["projectId","readOnly","features","tools"]);expect(method.tenantFields?.find((field)=>field.key==="mode")).toMatchObject({hidden:true,defaultValue:"tools",transport:{location:"query",name:"mode"}});expect(method.configRequirements).toBeUndefined();expect(method.requiredResourceFilters).toBeUndefined();expect(method.guidanceMd).toContain("optional advanced controls")}});
+ it("offers PostHog OAuth and API-key methods with zero-config defaults and advanced narrowing",()=>{const posthog=APP_DEFINITIONS.find((app)=>app.slug==="posthog");expect(posthog?.methods.map((method)=>method.key)).toEqual(["mcp-oauth","mcp-api-key"]);for(const method of posthog?.methods??[]){const projectField=method.tenantFields?.find((field)=>field.key==="projectId");expect(method.riskTier).toBe("S3");expect(method.tenantFields?.find((field)=>field.key==="readOnly")).toMatchObject({defaultValue:false,advanced:true});expect(projectField).toMatchObject({advanced:true,transport:{location:"header",name:"x-posthog-project-id"}});expect(projectField?.required).not.toBe(true);expect(method.tenantFields?.filter((field)=>field.advanced).map((field)=>field.key)).toEqual(["instanceUrl","projectId","readOnly","features","tools"]);expect(method.tenantFields?.find((field)=>field.key==="mode")).toMatchObject({hidden:true,defaultValue:"tools",transport:{location:"query",name:"mode"}});expect(method.configRequirements).toBeUndefined();expect(method.requiredResourceFilters).toBeUndefined();expect(method.guidanceMd).toContain("optional advanced controls")}});
  it("requires only reviewed provider or safety-boundary configuration on the default path",()=>{const required=APP_DEFINITIONS.flatMap((app)=>app.methods.flatMap((method)=>[...(method.tenantFields??[]),...(method.extensionFields??[])].filter((field)=>field.required&&field.advanced!==true&&!field.hidden).map((field)=>`${app.slug}:${method.key}:${field.key}`))).sort();expect(required).toEqual(["clickhouse:mcp-oauth:serviceId","shopify:storefront-mcp:storeDomain","shopify:ucp-commerce:storeDomain","supabase:mcp-api-key:projectRef","supabase:mcp-oauth:projectRef"])});
  it("limits Vercel Connect setup to the reviewed pilot methods",()=>{
   const reviewed=APP_DEFINITIONS.flatMap((app)=>app.methods.flatMap((method)=>method.credentialSources?.vercelConnect?[{slug:app.slug,key:method.key,review:method.credentialSources.vercelConnect}]:[]));
@@ -234,4 +234,25 @@ describe("AppDefinition catalog",()=>{
   expect(APP_DEFINITIONS.find((app)=>app.slug==="vercel")?.availability?.available).toBe(false);
  });
  it("enforces method and field invariants",()=>{for(const app of APP_DEFINITIONS)for(const method of app.methods){if(method.auth==="api_key")expect(method.keyPlacement).toBeTruthy();if(method.auth==="oauth")expect(method.ownershipModes.length).toBeGreaterThan(0);for(const field of method.credentialFields??[])if(field.required&&field.type!=="checkbox")expect(field.placeholder).toBeTruthy()}});
+ it("supports a self-hosted server URL override on PostHog and Supabase",()=>{
+  for(const slug of ["posthog","supabase"] as const){
+   const app=APP_DEFINITIONS.find((a)=>a.slug===slug);
+   expect(app).toBeTruthy();
+   for(const method of app!.methods){
+    // Each method opts in via defaults.serverUrlOverrideKey + a config-only field.
+    expect(method.defaults?.serverUrlOverrideKey).toBe("instanceUrl");
+    const instanceField=method.tenantFields?.find((field)=>field.key==="instanceUrl");
+    expect(instanceField).toMatchObject({type:"text",advanced:true});
+    expect(instanceField?.transport).toBeUndefined(); // never sent as header/query
+    const cloudDefault=method.defaults?.serverUrl;
+    // Blank (or whitespace) override falls back to the provider-hosted default.
+    expect(resolveConnectionMethodServerUrl(method,{})).toBe(cloudDefault);
+    expect(resolveConnectionMethodServerUrl(method,{instanceUrl:"   "})).toBe(cloudDefault);
+    // A supplied URL replaces the default entirely (self-hosted endpoint).
+    expect(resolveConnectionMethodServerUrl(method,{instanceUrl:"https://mcp.internal.example.com/mcp"})).toBe("https://mcp.internal.example.com/mcp");
+    // A malformed override resolves to null so connection setup fails closed.
+    expect(resolveConnectionMethodServerUrl(method,{instanceUrl:"not a url"})).toBeNull();
+   }
+  }
+ });
 });

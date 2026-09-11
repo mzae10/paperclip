@@ -215,6 +215,24 @@ export function resolveConnectionMethodServerUrl(
   method: ConnectionMethodDef,
   configValues: Record<string, string | boolean>,
 ): string | null {
+  // Self-hosted override: when the method names an override field and the
+  // operator supplied a value, it replaces the provider-hosted default entirely.
+  // A blank value falls through to the cloud default (serverUrl/template), so
+  // the same connector serves both hosted and self-hosted instances. The value
+  // is a full URL (scheme/host/port/path), unlike template placeholders which
+  // are URL-encoded parts, so it is parsed directly rather than substituted.
+  const overrideKey = method.defaults?.serverUrlOverrideKey;
+  if (overrideKey) {
+    const overrideValue = configValues[overrideKey];
+    if (typeof overrideValue === "string" && overrideValue.trim().length > 0) {
+      try {
+        return new URL(overrideValue.trim()).toString();
+      } catch {
+        return null;
+      }
+    }
+  }
+
   const template = method.defaults?.serverUrlTemplate;
   if (!template) return method.defaults?.serverUrl ?? null;
 
